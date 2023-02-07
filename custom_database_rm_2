@@ -1,0 +1,368 @@
+# -*- coding: utf-8 -*-
+"""
+Created on Tue Sep 13 09:12:49 2022
+
+@author: WY
+"""
+
+import numpy as np 
+import pandas as pd 
+import random
+from datetime import datetime
+import time
+
+class custom_database_rm_2:
+    
+    # determine f0
+    def f0_determine(self,freq_range):            
+        #max_mode = 4  
+        freq_range[1] = freq_range[1]#/max_mode # upper bound of f0 should not exceed over than max_mode x f0 (max_mode=4)
+        order1 = np.floor(np.log10(freq_range[0]))# lower bound of oscillation freq (/4 is required in Harmonic mode)
+        # order2 = np.ceil(np.log10(X2_range[1])-1)  # upper bound of oscillation freq (power term)
+        order2 = np.floor(np.log10(freq_range[1]))  # upper bound of oscillation freq (power term)
+        
+        spec_order = random.randint(order1, order2) # randumly choose frequency's power
+        
+        
+        if spec_order == order2: # if selected frequency's power equal to upper bound
+            c1 = freq_range[1]/10**order2
+            f0 = random.randrange(10**spec_order,c1*10**spec_order,step=freq_range[0]) 
+            print('spec_order=',spec_order)
+        elif spec_order == order1: # if selected frequency's power equal to lower bound
+            c1 = freq_range[0]/10**order1
+            f0 = random.randrange(c1*10**spec_order,10**(spec_order+1)+freq_range[0],step=freq_range[0])
+            print('spec_order=',spec_order)
+            print('mod=',c1)
+        elif spec_order not in [order1,order2]: # if selected frequency's power in the range
+            f0 = random.randrange(10**spec_order,10**(spec_order+1)+freq_range[0],step=freq_range[0])   
+            print('spec_order=',spec_order)
+        # print('upper bound of rotating freq=',order2)
+        print('f0=',f0)
+        return f0
+    
+    # random mode (multi-mode), random amplitude, and frequency
+    def Xrm_7(self,X2_range=[50,5e03],max_num_mode=4,
+              m_idx=[0,1,2,3,4],r_idx=[0.09,0.27,0.45,0.64,0.82,1],              
+              mode_range1=[[0],[1],[2],[3],[4],
+                           [0,1],[1,2],[2,3],[3,4],
+                           [0,1,2],[1,2,3],[2,3,4],
+                           [0,1,2,3],[1,2,3,4],
+                           [0,1,2,3,4]
+                           ],
+              seed_idx=0                                     
+              ):
+        
+        M = len(m_idx)
+        R = len(r_idx)
+        X1_rm = np.zeros(M*R,dtype=float).reshape([R,M])
+        X2_rm = np.zeros(M*R,dtype=float).reshape([R,M])                                   
+        X3_rm = np.zeros(M*R,dtype=float).reshape([R,M])
+        mode_r = [np.NaN]*R
+        mode_asign_list = [0]*R
+        
+        for rp1 in range(int(R)):
+            
+            random.seed(int(seed_idx)+int(str(rp1+int(time.time()*1e10))[::-1][0:3]))
+            mode_type = random.choice(mode_range1)
+            
+            mode_asign_list[rp1] = mode_type # list of mode number per layer
+            mode_r[rp1] = ','.join(str(e) for e in np.sort(mode_type))  # record the mode number per radial layer
+            
+        # wave amplitude 
+        for px1,rpx1 in enumerate(mode_asign_list): # radial layers
+            for mpx1 in list(rpx1): # mode numbers
+                # random.seed(1+int(mpx1)+int(px1)+time.time()*1e04)
+                random.seed(int(seed_idx)+int(str(mpx1+px1+int(time.time()*1e10))[::-1][0:3]))
+                # print('mpx1=',mpx1)
+                amp_random_range = np.arange(0.01,1+0.01,0.01)
+                X1_rm[px1,mpx1] = random.choice(amp_random_range)
+        
+        X1_rm = X1_rm/np.sum(X1_rm.reshape(np.size(X1_rm))) # asign the summation of profile to 1
+        # print('WYWYWYWYWYWYvWY')      
+        # wave frequency            
+        max_freq = 0
+        min_freq = 0 
+        iteration = 1
+        while max_freq == 0 or min_freq < 0:
+            for px1,rpx1 in enumerate(mode_asign_list): # radial layers
+                for mpx1 in list(rpx1): # mode numbers                
+                    random.seed(int(seed_idx)+int(str(mpx1+px1+int(time.time()*1e10))[::-1][0:3]))
+                    
+                    X2_rm[px1,mpx1] = self.f0_determine(X2_range) # determine frequency profile
+            
+            max_freq = np.max(X2_rm.reshape(np.size(X2_rm))) 
+            min_freq = np.min(X2_rm.reshape(np.size(X2_rm))) 
+            # print('max_freq=',max_freq)
+            # print('min_freq=',min_freq)
+            iteration+=1
+            if iteration >= 1000:
+                max_freq = 1
+                min_freq = 0
+                print('iteration >= 1000')
+                break
+        # initial phase
+        x3 = m_idx
+        random.seed(int(seed_idx)+int(str(int(time.time()*1e10))[::-1][0:3]))
+        ph0_r_state = random.choice(['linear','power'])
+        random.seed(int(seed_idx)+int(str(int(time.time()*1e10))[::-1][0:3])) 
+        ph0 = random.randrange(-180,180+1,step=1)
+        if ph0_r_state == 'linear':
+            random.seed(int(seed_idx)+int(str(int(time.time()*1e10))[::-1][0:3])) 
+            b3 = random.randrange(-180,180+1,step=1)
+            y3 = np.linspace(0,1,int(R))
+            random.seed(int(seed_idx)+int(str(int(time.time()*1e10))[::-1][0:3])) 
+            pp_y3 = random.randint(0,len(y3)-1)
+            random.seed(int(seed_idx)+int(str(int(time.time()*1e10))[::-1][0:3])) 
+            pha_random_range = np.arange(-1,1+0.1,0.1)
+            a3 = random.choice(pha_random_range)
+            f3 = a3*ph0*(y3-y3[pp_y3])+b3
+            
+            xp3, yp3 = np.meshgrid(x3, f3)            
+            
+            
+            yp3_copy = np.copy(yp3)
+            yp3_copy[yp3_copy==0] = 1
+            yp3_sign = yp3_copy/np.abs(yp3_copy)
+            
+            z3 = np.abs(yp3)%180 #*np.exp(-1*(xp3-x3[pp_m_X3])**2)
+            z3 = z3*yp3_sign
+            z3 = z3.astype(int)
+            
+        elif ph0_r_state == 'power':
+            random.seed(int(seed_idx)+int(str(int(time.time()*1e10))[::-1][0:3])) 
+            b3 = random.randrange(-180,180+1,step=1)
+            y3 = np.linspace(0,1,int(R))
+            random.seed(int(seed_idx)+int(str(int(time.time()*1e10))[::-1][0:3])) 
+            pp_y3 = random.randint(0,len(y3)-1)
+            random.seed(int(seed_idx)+int(str(int(time.time()*1e10))[::-1][0:3])) 
+            pha_random_range = np.arange(-1,1+0.1,0.1)
+            a3 = random.choice(pha_random_range)
+            f3 = a3*ph0*(y3-y3[pp_y3])**2+b3
+            
+            xp3, yp3 = np.meshgrid(x3, f3)            
+            # random.seed(2+time.time()*1e03) 
+            
+            yp3_copy = np.copy(yp3)
+            yp3_copy[yp3_copy==0] = 1
+            yp3_sign = yp3_copy/np.abs(yp3_copy)
+            
+            z3 = np.abs(yp3)%180 #*np.exp(-1*(xp3-x3[pp_m_X3])**2)
+            z3 = z3*yp3_sign
+            z3 = z3.astype(int)
+        
+        for px3,rpx3 in enumerate(mode_asign_list): # radial layers
+            for mpx3 in list(rpx3): # mode numbers
+                random.seed(int(seed_idx)+int(str(int(time.time()*1e10))[::-1][0:3]))
+                
+                X3_rm[px1,mpx1] = z3[px1,mpx1]
+        
+                
+        # record the important parameters of profile
+                                
+        df_X1_rm = pd.DataFrame(X1_rm,columns=m_idx,index=r_idx) 
+        df_X2_rm = pd.DataFrame(X2_rm,columns=m_idx,index=r_idx) 
+        df_X3_rm = pd.DataFrame(X3_rm,columns=m_idx,index=r_idx) 
+        
+        dict_return = {'X1_rm':df_X1_rm,'X2_rm':df_X2_rm,'X3_rm':df_X3_rm,
+                       'max_F':max_freq,'min_F':min_freq,
+                       'mode_r1':mode_r[0],'mode_r2':mode_r[1],'mode_r3':mode_r[2],
+                       'mode_r4':mode_r[3],'mode_r5':mode_r[4],'mode_r6':mode_r[5],                       
+                       }
+            
+            
+        return dict_return
+    
+    # Group A, B, and C with gausion in Amp profile, linear in freq profile
+    def Xrm_8(self,X2_range=[50,5e03],
+              m_idx=[0,1,2,3,4],r_idx=[0.09,0.27,0.45,0.64,0.82,1],              
+              mode_range1=[[0],[1],[2],[3],[4],                           
+                           ], 
+              mode_range2=[#[0],[1],[2],[3],[4],
+                           [0,1],[1,2],[2,3],[3,4],
+                           [0,1,2],[1,2,3],[2,3,4],
+                           [0,1,2,3],[1,2,3,4],
+                           [0,1,2,3,4]
+                           ], 
+              group_state = 'Group_A',
+              seed_idx=0
+              ):
+         
+        M = len(m_idx)
+        R = len(r_idx)
+        X1_rm = np.zeros(M*R,dtype=float).reshape([R,M])
+        X2_rm = np.zeros(M*R,dtype=float).reshape([R,M])                                   
+        X3_rm = np.zeros(M*R,dtype=float).reshape([R,M])
+        mode_r = [np.NaN]*R
+        mode_asign_list = [0]*R
+        # group_state = random.choice(['Group_A','Group_B'])
+        if group_state == 'Group_A':
+            # Group A (fix mode number with single mode in all radial layers)
+            # asign mode number in radial layer            
+            random.seed(int(seed_idx)+int(str(int(time.time()*1e10))[::-1][0:3])) # define random seed
+            mode_type = random.choice(mode_range1)
+            for rp1 in range(int(R)):           
+                mode_asign_list[rp1] = mode_type # list of mode number per layer
+                mode_r[rp1] = ','.join(str(e) for e in np.sort(mode_type))  # record the mode number per radial layer
+        elif group_state == 'Group_B': 
+            # Group B (different mode number with single mode in all radial layers)
+            # asign mode number in radial layer            
+            for rp1 in range(int(R)):    
+                
+                random.seed(int(seed_idx)+int(str(rp1+int(time.time()*1e10))[::-1][0:3])) # define random seed
+                mode_type = random.choice(mode_range1)
+                mode_asign_list[rp1] = mode_type # list of mode number per layer
+                mode_r[rp1] = ','.join(str(e) for e in np.sort(mode_type))  # record the mode number per radial layer
+        elif group_state == 'Group_C': 
+            # Group B (different mode number with single mode in all radial layers)
+            # asign mode number in radial layer            
+            for rp1 in range(int(R)):    
+                # random.seed(2+time.time()*1e02)
+                random.seed(int(seed_idx)+int(str(rp1+int(time.time()*1e10))[::-1][0:3]))
+                mode_type = random.choice(mode_range2)
+                mode_asign_list[rp1] = mode_type # list of mode number per layer
+                mode_r[rp1] = ','.join(str(e) for e in np.sort(mode_type))  # record the mode number per radial layer
+        
+        # wave amplitude 
+        x1 = m_idx # /max(np.abs(m_idx))
+        y1 = r_idx # np.linspace(0,1,int(R))
+        xp1, yp1 = np.meshgrid(x1, y1)
+        
+        # sy1_range = np.append(np.arange(0.01,1+0.01,0.02),[10])
+        sy1_range = np.arange(0.01,1+0.01,0.1)
+        sx1 = 0.1 # only cover the single mode
+        random.seed(int(seed_idx)+int(str(int(time.time()*1e10))[::-1][0:3]))
+        sy1 = random.choice(sy1_range)
+        pp_r = random.choice([r_idx[0]]) # chose peak position of gausion
+        
+        for idx_r1,rpx1 in enumerate(mode_asign_list): # radial layers
+            for idx_m1,mpx1 in enumerate(rpx1): # mode numbers
+                random.seed(int(seed_idx)+int(str(int(time.time()*1e10))[::-1][0:3]))
+                print('mpx1=',mpx1)
+                n0 = 1*np.exp(-1*(xp1-mpx1)**2/(sx1)) # mode dependence
+                z1 = n0*np.exp(-1*(yp1-pp_r)**2/(sy1)) # radial dependence
+                X1_rm[idx_r1,mpx1] = z1[idx_r1,mpx1]
+                # amp_random_range = np.arange(0.01,1+0.01,0.01)
+                # X1_rm[px1,mpx1] = random.choice(amp_random_range)
+        X1_rm = X1_rm/np.sum(X1_rm.reshape(np.size(X1_rm))) # asign the summation of profile to 1
+        
+        # wave frequency                    
+        max_freq = 0
+        min_freq = 0 
+        iteration = 1        
+        x2 = m_idx
+        y2 = r_idx
+        random.seed(int(seed_idx)+int(str(int(time.time()*1e10))[::-1][0:3]))
+        f0_r_state = random.choice(['linear'])
+        
+        xp2, yp2 = np.meshgrid(x2, y2)
+        # unvalible_cond = [max_freq == 0,min_freq < 0,max_freq > X2_range[1]]
+        # print('unvalible_cond=',unvalible_cond)
+        # while max_freq == 0 or min_freq < 0:
+        while True in [max_freq == 0,min_freq < 0,max_freq > X2_range[1]]:
+            
+            random.seed(int(seed_idx)+int(str(int(time.time()*1e10))[::-1][0:3]))
+            f0_pre = self.f0_determine(freq_range=X2_range)
+            pp_yp2 = random.choice(r_idx)
+            
+            if f0_r_state == 'linear':
+                # rand_seed = str(int(time.time()*(1e02)))[::-1][0:6]
+                random.seed(int(seed_idx)+int(str(int(time.time()*1e10))[::-1][0:3]))
+                
+                f0_slope_range = np.arange(1,-1-0.1,-0.2)*X2_range[1]
+                f0_slope_range = f0_slope_range.round(0)
+                print('f0_slope_range=',f0_slope_range)
+                s2 = random.choice(f0_slope_range)
+                
+                f2 = s2*yp2+f0_pre
+                for idx_rpx1,rpx1 in enumerate(mode_asign_list): # mode number in radial layers
+                    for idx_mpx1,mpx1 in enumerate(rpx1): # mode numbers in the same layer
+                        
+                        X2_rm[idx_rpx1,mpx1] = f2[idx_rpx1,mpx1]# determine frequency profile
+                        
+                    
+            max_freq = np.max(X2_rm.reshape(np.size(X2_rm))) 
+            min_freq = np.min(X2_rm.reshape(np.size(X2_rm))) 
+            print('max_freq=',max_freq)
+            print('min_freq=',min_freq)
+            iteration+=1
+            if iteration >= 1000:
+                max_freq = 1
+                min_freq = 0
+                print(str([max_freq == 0,min_freq < 0,max_freq > X2_range[1]]))
+                print('iteration >= 1000')
+                break
+        
+        
+            
+        # initial phase
+        x3 = m_idx
+        random.seed(int(seed_idx)+int(str(int(time.time()*1e10))[::-1][0:3]))
+        ph0_r_state = random.choice(['linear','power'])
+        random.seed(int(seed_idx)+int(str(int(time.time()*1e10))[::-1][0:3])) 
+        ph0 = random.randrange(-180,180+1,step=1)
+        if ph0_r_state == 'linear':
+            random.seed(int(seed_idx)+int(str(int(time.time()*1e10))[::-1][0:3])) 
+            b3 = random.randrange(-180,180+1,step=1)
+            y3 = np.linspace(0,1,int(R))
+            random.seed(int(seed_idx)+int(str(int(time.time()*1e10))[::-1][0:3])) 
+            pp_y3 = random.randint(0,len(y3)-1)
+            random.seed(int(seed_idx)+int(str(int(time.time()*1e10))[::-1][0:3])) 
+            pha_random_range = np.arange(-1,1+0.1,0.1)
+            a3 = random.choice(pha_random_range)
+            f3 = a3*ph0*(y3-y3[pp_y3])+b3
+            
+            xp3, yp3 = np.meshgrid(x3, f3)            
+            # random.seed(2+time.time()*1e03) 
+            
+            yp3_copy = np.copy(yp3)
+            yp3_copy[yp3_copy==0] = 1
+            yp3_sign = yp3_copy/np.abs(yp3_copy)
+            
+            z3 = np.abs(yp3)%180 #*np.exp(-1*(xp3-x3[pp_m_X3])**2)
+            z3 = z3*yp3_sign
+            z3 = z3.astype(int)
+            
+        elif ph0_r_state == 'power':
+            random.seed(int(seed_idx)+int(str(int(time.time()*1e10))[::-1][0:3])) 
+            b3 = random.randrange(-180,180+1,step=1)
+            y3 = np.linspace(0,1,int(R))
+            random.seed(int(seed_idx)+int(str(int(time.time()*1e10))[::-1][0:3])) 
+            pp_y3 = random.randint(0,len(y3)-1)
+            random.seed(int(seed_idx)+int(str(int(time.time()*1e10))[::-1][0:3])) 
+            pha_random_range = np.arange(-1,1+0.1,0.1)
+            a3 = random.choice(pha_random_range)
+            f3 = a3*ph0*(y3-y3[pp_y3])**2+b3
+            
+            xp3, yp3 = np.meshgrid(x3, f3)            
+            # random.seed(2+time.time()*1e03) 
+            
+            yp3_copy = np.copy(yp3)
+            yp3_copy[yp3_copy==0] = 1
+            yp3_sign = yp3_copy/np.abs(yp3_copy)
+            
+            z3 = np.abs(yp3)%180 #*np.exp(-1*(xp3-x3[pp_m_X3])**2)
+            z3 = z3*yp3_sign
+            z3 = z3.astype(int)
+        
+        for px3,rpx3 in enumerate(mode_asign_list): # radial layers
+            for mpx3 in list(rpx3): # mode numbers
+                # random.seed(4+time.time()*1e04)
+                
+                X3_rm[px3,mpx3] = z3[px3,mpx3]
+        
+                
+        # record the important parameters of profile
+        
+        df_X1_rm = pd.DataFrame(X1_rm,columns=m_idx,index=r_idx) 
+        df_X2_rm = pd.DataFrame(X2_rm,columns=m_idx,index=r_idx) 
+        df_X3_rm = pd.DataFrame(X3_rm,columns=m_idx,index=r_idx) 
+        
+        dict_return = {'X1_rm':df_X1_rm,'X2_rm':df_X2_rm,'X3_rm':df_X3_rm,
+                       'max_F':max_freq,'min_F':min_freq,'slope_Freq_r':s2,'slope_Amp_r':sy1,
+                       'group_state':group_state,                       
+                       'mode_r1':mode_r[0],'mode_r2':mode_r[1],'mode_r3':mode_r[2],
+                       'mode_r4':mode_r[3],'mode_r5':mode_r[4],'mode_r6':mode_r[5],                       
+                       }
+        
+        
+        return dict_return
