@@ -1,0 +1,54 @@
+# -*- coding: utf-8 -*-
+"""
+Created on Tue Mar  2 17:49:36 2021
+
+@author: WY
+"""
+# =============================================================================
+import os
+# =============================================================================
+# input 
+# path : list type
+# output
+# save_1 : string
+
+# the last location be not considered
+def path_check1(path):    
+    for b,ba in enumerate(path):
+        if b == 0:
+            save_1 =  os.path.join(ba)
+        elif b == len(path)-1:
+            save_1 =  os.path.join(save_1,ba)
+            # print('b=',b,' jump!!')
+            continue # the last one jump out of loop
+            # print('save_1=',save_1)
+        else:
+            # print('save_1=',save_1)
+            save_1 =  os.path.join(save_1,ba)
+          
+        if os.path.exists(save_1):
+            pass
+        else:    
+            os.mkdir(save_1)        
+
+    return save_1
+
+# the last location be considered
+def path_check2(path):    
+    for b,ba in enumerate(path):
+        if b == 0:
+            save_1 =  os.path.join(ba)
+        
+        else:
+            # print('save_1=',save_1)
+            save_1 =  os.path.join(save_1,ba)
+          
+        if os.path.exists(save_1):
+            pass
+        else:    
+            os.mkdir(save_1)        
+
+    return save_1
+
+
+# =============================================================================
