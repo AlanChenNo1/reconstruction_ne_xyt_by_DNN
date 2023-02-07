@@ -1,0 +1,322 @@
+# -*- coding: utf-8 -*-
+"""
+Created on Tue Sep 13 09:18:16 2022
+
+@author: WY
+"""
+# this code is use to produce the database of amp.(r,m) and freq.(r,m) profile
+import numpy as np 
+import pandas as pd 
+import os
+# import matplotlib.pyplot as plt
+import scipy.special as sc
+import scipy.optimize as op
+import random
+from datetime import datetime
+import time
+from path_check import path_check1,path_check2
+from custom_database_rm_2 import custom_database_rm_2 as cd
+start_time = time.time() # record start time
+# =============================================================================
+# ne parameters produce (r,m) array
+#def ne_rm_produce(mode,sets=1,rm_size=(6,5),**bound):
+date = 20220913 # 20211127 20211118 20210122 20210413 20210512 20210625 20211108 20211109 20211110 20211111 20211112(m=0~1) 20211113(single mode,double mode)
+# shot = [52,56,57,58,59,61,62,65,66,67,68,69,70,71,72,75,76] # from shot
+nums = 1e01 # number of database to provide 
+sets = [1,1+nums] # from shot ? to shot ?
+shot = np.arange(sets[0],sets[1],1,dtype=int)
+
+# list_rm = [0]*sets
+rad_num = 6
+mod_num = 5
+mode = 'Group_B' # 'Group_A' 'Group_B' 'Group_C' 'random' 'artificial'
+
+save_abs_path_label =os.path.join(r'C:\WY_need_data',str(date),'database','label') # save Amp(r,m), freq(r,m)
+
+save_abs_path_df1 = path_check2([r'C:\WY_need_data',str(date),'database'])  # save detail dataframe
+index_df1 = [str(date)+str(shotnum).zfill(3) for i,shotnum in enumerate(shot)] # index of detail dataframe
+
+L1_name = [os.path.join(str(date)+str(shotnum).zfill(3)+'_true_L1_Am'+'.csv') for i,shotnum in enumerate(shot)]
+L2_name = [os.path.join(str(date)+str(shotnum).zfill(3)+'_true_L2_Fr'+'.csv') for i,shotnum in enumerate(shot)]
+L3_name = [os.path.join(str(date)+str(shotnum).zfill(3)+'_true_L3_ph'+'.csv') for i,shotnum in enumerate(shot)]
+# =============================================================================
+# check if file exist or not, to prevent the recover (save database label)
+a = 0
+while os.path.exists(os.path.join(save_abs_path_label)) :
+    a+=1
+    save_abs_path_label = os.path.join(save_abs_path_df1,'label ('+str(a)+')')
+         
+    if a >= 100:
+        print('iteration time >= 100')
+        break
+
+# check if file exist or not, to prevent the recover (save database detail list)
+save_path_df1 = os.path.join(save_abs_path_df1,'database_detail'+'.csv')    
+while os.path.exists(save_path_df1):
+    save_path_df1 = os.path.join(save_abs_path_df1,'database_detail'+' ('+str(a)+')'+'.csv')
+    # print('fig_address=',fig_address)
+    a+=1  
+    if a >= 100:
+        print('iteration time >= 100')
+        break    
+
+if mode == 'Group_A':
+    dick_detail = {
+                    'max_F':[np.NaN]*len(shot),'min_F':[np.NaN]*len(shot),
+                    'slope_Freq_r':[np.NaN]*len(shot),'slope_Amp_r':[np.NaN]*len(shot),
+                    'group_state':[np.NaN]*len(shot),
+                    'mode_r1':[np.NaN]*len(shot),'mode_r2':[np.NaN]*len(shot),'mode_r3':[np.NaN]*len(shot),
+                    'mode_r4':[np.NaN]*len(shot),'mode_r5':[np.NaN]*len(shot),'mode_r6':[np.NaN]*len(shot),                       
+                    }
+       
+    # conduct the generation of Amp, freq, and phase profile for each shot
+    for i,shotnum in enumerate(shot):
+        fun_database = cd()
+        Xrm = fun_database.Xrm_8(X2_range=[50,5e03],
+                                 m_idx=[0,1,2,3,4],r_idx=[0.09,0.27,0.45,0.64,0.82,1],              
+                                 mode_range1=[[0],[1],[2],[3],[4],                           
+                                              ], 
+                                 mode_range2=[#[0],[1],[2],[3],[4],
+                                              [0,1],[1,2],[2,3],[3,4],
+                                              [0,1,2],[1,2,3],[2,3,4],
+                                              [0,1,2,3],[1,2,3,4],
+                                              [0,1,2,3,4]
+                                              ], 
+                                 group_state = 'Group_A',
+                                 seed_idx=i
+                                 )
+         
+        data1_y1 = Xrm['X1_rm'] # dataframe type
+        data1_y2 = Xrm['X2_rm'] # dataframe type
+        data1_y3 = Xrm['X3_rm'] # dataframe type
+                
+        dick_detail['max_F'][i] = Xrm['max_F']
+        dick_detail['min_F'][i] = Xrm['min_F']
+        dick_detail['slope_Freq_r'][i] = Xrm['slope_Freq_r']
+        dick_detail['slope_Amp_r'][i] = Xrm['slope_Amp_r']
+        dick_detail['group_state'][i] = Xrm['group_state']
+        
+        dick_detail['mode_r1'][i] = Xrm['mode_r1']
+        dick_detail['mode_r2'][i] = Xrm['mode_r2']
+        dick_detail['mode_r3'][i] = Xrm['mode_r3']
+        dick_detail['mode_r4'][i] = Xrm['mode_r4']
+        dick_detail['mode_r5'][i] = Xrm['mode_r5']
+        dick_detail['mode_r6'][i] = Xrm['mode_r6']
+        
+        # save ouput of DNN database as csv        
+        save_L1_path = path_check1([save_abs_path_label,L1_name[i]])
+        save_L2_path = path_check1([save_abs_path_label,L2_name[i]])
+        save_L3_path = path_check1([save_abs_path_label,L3_name[i]])
+        print('save_L1_path=',save_L1_path)
+        data1_y1.to_csv(path_or_buf=save_L1_path)
+        data1_y2.to_csv(path_or_buf=save_L2_path)
+        data1_y3.to_csv(path_or_buf=save_L3_path)  
+        
+        index_df1 = [str(date)+str(shotnum).zfill(3) for i,shotnum in enumerate(shot)] # index of detail dataframe
+        df1 = pd.DataFrame(dick_detail,index=index_df1) # dataframe of database detail
+        df1.to_csv(path_or_buf=save_path_df1)      # save dataframe of database detail as csv file
+elif mode == 'Group_B':
+    dick_detail = {
+                    'max_F':[np.NaN]*len(shot),'min_F':[np.NaN]*len(shot),
+                    'slope_Freq_r':[np.NaN]*len(shot),'slope_Amp_r':[np.NaN]*len(shot),
+                    'group_state':[np.NaN]*len(shot),
+                    'mode_r1':[np.NaN]*len(shot),'mode_r2':[np.NaN]*len(shot),'mode_r3':[np.NaN]*len(shot),
+                    'mode_r4':[np.NaN]*len(shot),'mode_r5':[np.NaN]*len(shot),'mode_r6':[np.NaN]*len(shot),                       
+                    }
+       
+    # conduct the generation of Amp, freq, and phase profile for each shot
+    for i,shotnum in enumerate(shot):
+        fun_database = cd()
+        Xrm = fun_database.Xrm_8(X2_range=[50,5e03],
+                                 m_idx=[0,1,2,3,4],r_idx=[0.09,0.27,0.45,0.64,0.82,1],              
+                                 mode_range1=[[0],[1],[2],[3],[4],                           
+                                              ], 
+                                 mode_range2=[#[0],[1],[2],[3],[4],
+                                              [0,1],[1,2],[2,3],[3,4],
+                                              [0,1,2],[1,2,3],[2,3,4],
+                                              [0,1,2,3],[1,2,3,4],
+                                              [0,1,2,3,4]
+                                              ], 
+                                 group_state = 'Group_B',
+                                 )
+         
+        data1_y1 = Xrm['X1_rm'] # dataframe type
+        data1_y2 = Xrm['X2_rm'] # dataframe type
+        data1_y3 = Xrm['X3_rm'] # dataframe type
+                
+        dick_detail['max_F'][i] = Xrm['max_F']
+        dick_detail['min_F'][i] = Xrm['min_F']
+        dick_detail['slope_Freq_r'][i] = Xrm['slope_Freq_r']
+        dick_detail['slope_Amp_r'][i] = Xrm['slope_Amp_r']
+        dick_detail['group_state'][i] = Xrm['group_state']
+        
+        dick_detail['mode_r1'][i] = Xrm['mode_r1']
+        dick_detail['mode_r2'][i] = Xrm['mode_r2']
+        dick_detail['mode_r3'][i] = Xrm['mode_r3']
+        dick_detail['mode_r4'][i] = Xrm['mode_r4']
+        dick_detail['mode_r5'][i] = Xrm['mode_r5']
+        dick_detail['mode_r6'][i] = Xrm['mode_r6']
+        
+        # save ouput of DNN database as csv        
+        save_L1_path = path_check1([save_abs_path_label,L1_name[i]])
+        save_L2_path = path_check1([save_abs_path_label,L2_name[i]])
+        save_L3_path = path_check1([save_abs_path_label,L3_name[i]])
+        print('save_L1_path=',save_L1_path)
+        data1_y1.to_csv(path_or_buf=save_L1_path)
+        data1_y2.to_csv(path_or_buf=save_L2_path)
+        data1_y3.to_csv(path_or_buf=save_L3_path)  
+        
+        index_df1 = [str(date)+str(shotnum).zfill(3) for i,shotnum in enumerate(shot)] # index of detail dataframe
+        df1 = pd.DataFrame(dick_detail,index=index_df1) # dataframe of database detail
+        df1.to_csv(path_or_buf=save_path_df1)      # save dataframe of database detail as csv file
+                
+elif mode == 'Group_C':
+    dick_detail = {
+                    'max_F':[np.NaN]*len(shot),'min_F':[np.NaN]*len(shot),
+                    'slope_Freq_r':[np.NaN]*len(shot),'slope_Amp_r':[np.NaN]*len(shot),
+                    'group_state':[np.NaN]*len(shot),
+                    'mode_r1':[np.NaN]*len(shot),'mode_r2':[np.NaN]*len(shot),'mode_r3':[np.NaN]*len(shot),
+                    'mode_r4':[np.NaN]*len(shot),'mode_r5':[np.NaN]*len(shot),'mode_r6':[np.NaN]*len(shot),                       
+                    }
+       
+    # conduct the generation of Amp, freq, and phase profile for each shot
+    for i,shotnum in enumerate(shot):
+        fun_database = cd()
+        Xrm = fun_database.Xrm_8(X2_range=[50,5e03],
+                                 m_idx=[0,1,2,3,4],r_idx=[0.09,0.27,0.45,0.64,0.82,1],              
+                                 mode_range1=[[0],[1],[2],[3],[4],                           
+                                              ], 
+                                 mode_range2=[#[0],[1],[2],[3],[4],
+                                              [0,1],[1,2],[2,3],[3,4],
+                                              [0,1,2],[1,2,3],[2,3,4],
+                                              [0,1,2,3],[1,2,3,4],
+                                              [0,1,2,3,4]
+                                              ], 
+                                 group_state = 'Group_C',
+                                 )
+         
+        data1_y1 = Xrm['X1_rm'] # dataframe type
+        data1_y2 = Xrm['X2_rm'] # dataframe type
+        data1_y3 = Xrm['X3_rm'] # dataframe type
+                
+        dick_detail['max_F'][i] = Xrm['max_F']
+        dick_detail['min_F'][i] = Xrm['min_F']
+        dick_detail['slope_Freq_r'][i] = Xrm['slope_Freq_r']
+        dick_detail['slope_Amp_r'][i] = Xrm['slope_Amp_r']
+        dick_detail['group_state'][i] = Xrm['group_state']
+        
+        dick_detail['mode_r1'][i] = Xrm['mode_r1']
+        dick_detail['mode_r2'][i] = Xrm['mode_r2']
+        dick_detail['mode_r3'][i] = Xrm['mode_r3']
+        dick_detail['mode_r4'][i] = Xrm['mode_r4']
+        dick_detail['mode_r5'][i] = Xrm['mode_r5']
+        dick_detail['mode_r6'][i] = Xrm['mode_r6']
+        
+        # save ouput of DNN database as csv        
+        save_L1_path = path_check1([save_abs_path_label,L1_name[i]])
+        save_L2_path = path_check1([save_abs_path_label,L2_name[i]])
+        save_L3_path = path_check1([save_abs_path_label,L3_name[i]])
+        print('save_L1_path=',save_L1_path)
+        data1_y1.to_csv(path_or_buf=save_L1_path)
+        data1_y2.to_csv(path_or_buf=save_L2_path)
+        data1_y3.to_csv(path_or_buf=save_L3_path)  
+        
+        index_df1 = [str(date)+str(shotnum).zfill(3) for i,shotnum in enumerate(shot)] # index of detail dataframe
+        df1 = pd.DataFrame(dick_detail,index=index_df1) # dataframe of database detail
+        df1.to_csv(path_or_buf=save_path_df1)      # save dataframe of database detail as csv file
+                
+elif mode == 'random':
+    dick_detail = {
+                       'max_F':[np.NaN]*len(shot),'min_F':[np.NaN]*len(shot),
+                       'mode_r1':[np.NaN]*len(shot),'mode_r2':[np.NaN]*len(shot),'mode_r3':[np.NaN]*len(shot),
+                       'mode_r4':[np.NaN]*len(shot),'mode_r5':[np.NaN]*len(shot),'mode_r6':[np.NaN]*len(shot),                       
+                       }
+    # conduct the generation of Amp, freq, and phase profile for each shot
+    for i,shotnum in enumerate(shot):
+        fun_database = cd()
+        Xrm = fun_database.Xrm_7(X2_range=[50,5e03],max_num_mode=4,
+                       m_idx=[0,1,2,3,4],r_idx=[0.09,0.27,0.45,0.64,0.82,1],              
+                       mode_range1=[[0],[1],[2],[3],[4],
+                                    [0,1],[1,2],[2,3],[3,4],
+                                    [0,1,2],[1,2,3],[2,3,4],
+                                    [0,1,2,3],[1,2,3,4],
+                                    [0,1,2,3,4]
+                                    ],                                        
+                       )
+        
+        data1_y1 = Xrm['X1_rm'] # dataframe type
+        data1_y2 = Xrm['X2_rm'] # dataframe type
+        data1_y3 = Xrm['X3_rm'] # dataframe type
+                
+        dick_detail['max_F'][i] = Xrm['max_F']
+        dick_detail['min_F'][i] = Xrm['min_F']
+        dick_detail['mode_r1'][i] = Xrm['mode_r1']
+        dick_detail['mode_r2'][i] = Xrm['mode_r2']
+        dick_detail['mode_r3'][i] = Xrm['mode_r3']
+        dick_detail['mode_r4'][i] = Xrm['mode_r4']
+        dick_detail['mode_r5'][i] = Xrm['mode_r5']
+        dick_detail['mode_r6'][i] = Xrm['mode_r6']
+        
+        # save ouput of DNN database as csv
+        save_L1_path = path_check1([save_abs_path_label,L1_name[i]])
+        save_L2_path = path_check1([save_abs_path_label,L2_name[i]])
+        save_L3_path = path_check1([save_abs_path_label,L3_name[i]])
+        print('save_L1_path=',save_L1_path)
+        data1_y1.to_csv(path_or_buf=save_L1_path)
+        data1_y2.to_csv(path_or_buf=save_L2_path)
+        data1_y3.to_csv(path_or_buf=save_L3_path)  
+        
+        index_df1 = [str(date)+str(shotnum).zfill(3) for i,shotnum in enumerate(shot)] # index of detail dataframe
+        df1 = pd.DataFrame(dick_detail,index=index_df1) # dataframe of database detail
+        df1.to_csv(path_or_buf=save_path_df1)      # save dataframe of database detail as csv file
+        
+
+
+elif mode == 'artificial':
+
+    # produce parameters artificially   
+    Am_rm = np.array([[0,0,0,1,0],
+                      [0,0,0,0,0],
+                      [0,0,0,2,0],
+                      
+                      [0,0,0,0,0], 
+                      [0,0,0,0,0],
+                      [0,0,0,0,0],
+                      ])
+    # Am_rm = Am_rm/np.sum(Am_rm.reshape(Am_rm.size))
+    fr_rm = np.array([[0,0,0,0,0],
+                      [0,0,0,0,0],
+                      [0,0,0,0,0],
+                      
+                      [0,0,0,0,0],
+                      [0,0,0,0,0],
+                      [0,0,0,0,0],
+                      ])
+    ph_rm = np.array([[0,0,0,0,0],
+                      [0,0,0,0,0],
+                      [0,0,0,0,0],
+                      [0,0,0,0,0],
+                      [0,0,0,0,0],
+                      [0,0,0,0,0],
+                      ])
+    # ph_rm = np.deg2rad(ph_rm)
+            
+    Am_rm = Am_rm/np.sum(Am_rm.reshape(np.size(Am_rm))) # normalize Amp(r,m) by sum(Amp(r,m))
+    
+    Xrm_index = np.round(np.linspace(0.75,8.25,num=rad_num)/8.25,2)
+    Xrm_colum = np.linspace(0,int(mod_num-1),num=mod_num)
+    data1_y1 = pd.DataFrame(Am_rm,index=Xrm_index,columns=Xrm_colum)
+    data1_y2 = pd.DataFrame(fr_rm,index=Xrm_index,columns=Xrm_colum)    
+    data1_y3 = pd.DataFrame(ph_rm,index=Xrm_index,columns=Xrm_colum) 
+    
+    save_L1_path = path_check1([save_abs_path_label,'_true_L1_Am'+'.csv'])
+    save_L2_path = path_check1([save_abs_path_label,'_true_L2_Fr'+'.csv'])
+    save_L3_path = path_check1([save_abs_path_label,'_true_L3_ph'+'.csv'])
+    
+    data1_y1.to_csv(path_or_buf=save_L1_path)
+    data1_y2.to_csv(path_or_buf=save_L2_path)
+    data1_y3.to_csv(path_or_buf=save_L3_path)  
+    
+# =============================================================================
+print("--- %.1f seconds ---" % (time.time() - start_time))
+print("--- %.2f minutes ---" % ((time.time() - start_time)/60))
